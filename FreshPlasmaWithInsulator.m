@@ -17,7 +17,7 @@ L=1;%Length
 e0=1;%Epsilon Naught
 k=1.68637205*10^-10;
 DT=.05;%DeltaT
-NT=100;%Iterations
+NT=200;%Iterations
 NTOUT=25;%Not used???
 NG=15;%Number of Grid Points
 nden=5;
@@ -101,11 +101,18 @@ Ey=zeros(NG^2,1);
 xmom=zeros(NT,1);
 ymom=zeros(NT,1);
 totEn=zeros(NT,1);
+totEnWLost=zeros(NT,1);
 totUEn=zeros(NT,1);
 totKEn=zeros(NT,1);
 UdUE=zeros(NT,1);
 LdUE=zeros(NT,1);
 lostenergy=0;
+
+bins=10;
+s1cdx=linspace(0,2*pi,bins);
+s1cdy=zeros(bins,1);
+s2cdx=linspace(0,2*pi,bins);
+s2cdy=zeros(bins,1);
 
 %sphere1
 sxc1=2*L/5;
@@ -163,11 +170,11 @@ plot(sx1,nsy1,'r')
 plot(sx2,sy2,'r')
 plot(sx2,nsy2,'r')
 axis([L/NG L-L/NG L/NG L-L/NG])
-%plot([Ex1(5,1:10) Ex1(5,1:10)])
 
 
 
-%hold off;
+
+hold off;
 
 %Cone=me/k/Temp;
 %Conp=mp/k/Temp;
@@ -179,17 +186,17 @@ axis([L/NG L-L/NG L/NG L-L/NG])
 %hold on;
 %plot(xtemp,ytemp)
     drawnow 
-      % Capture the plot as an image 
+      %Capture the plot as an image 
       frame = getframe(h); 
       im = frame2im(frame); 
       [imind,cm] = rgb2ind(im,256); 
-      % Write to the GIF File 
+      %Write to the GIF File 
       if it == 1 
           imwrite(imind,cm,filename,'gif', 'Loopcount',inf); 
-      else 
+     else 
           imwrite(imind,cm,filename,'gif','WriteMode','append'); 
-      end 
-hold off
+     end 
+%hold off
 xp=xp+vxp*DT;
 yp=yp+vyp*DT;
 % apply bc on the particle positions
@@ -270,7 +277,7 @@ vyp=[vyp;randvtot.*sin(randang)];
 
 randmat=randi([0 1],Nnew,1);
 
-emat=[emat 0*e*randmat'-e];
+emat=[emat 2*e*randmat'-e];
 massmat=[massmat (mp-me)*randmat'+me];
 c=[c 9*randmat'+1];
 
@@ -318,6 +325,7 @@ if isempty(j)==0
     rho_sphere1=rho_sphere1+sum(emat(j).*weight(:,j),2)/dx^2;
     weight(:,j)=[];
 end
+(sign(xp(out)-sxc1)+1).*(atan((yp(out)-syc1)./(xp(out)-sxc1)));
 lostenergy=lostenergy+.5*massmat(out)*(vxp(out).^2+vyp(out).^2);
 xp(out)=[];
 yp(out)=[];
@@ -433,9 +441,9 @@ totKEn(it)=.5*sum(massmat*(vxp.^2+vyp.^2),'all');
 
 it
 
-LeftSphereForceLateral(it)=-rho_sphere1'*Ex
+LeftSphereForceLateral(it)=-rho_sphere1'*Ex;
 LeftSphereForceLongitude=-rho_sphere1'*Ey;
-RightSphereForceLateral(it)=-rho_sphere2'*Ex
+RightSphereForceLateral(it)=-rho_sphere2'*Ex;
 RightSphereForceLongitude=-rho_sphere2'*Ey;
 
 Temp=(sum(massmat*(vxp.^2+vyp.^2),'all')/N)/2/k;
