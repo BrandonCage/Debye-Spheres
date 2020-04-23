@@ -13,7 +13,7 @@ e0=1;%Epsilon Naught
 k=1.68637205*10^-10;%Boltzman
 DT=.01*2.284*10^10;%DeltaT
 NT=100;%Iterations
-NG=10;%Number of Grid Points
+NG=30;%Number of Grid Points
 nden=5;%Total charge of electrons in simulation
 
 
@@ -119,8 +119,8 @@ s2cdy=zeros(bins,1);%Initialize at 0 charge
 
 %sphere1
 sxc1=L/2;%Sphere 1 x center
-syc1=L/2;%Sphere 1 y center
-sr1=L/4;%Sphere 1 radius
+syc1=2*L/3;%Sphere 1 y center
+sr1=L/5;%Sphere 1 radius
 vsx1=0;%X Velocity of sphere 1
 vsy1=0;%Y velocity of sphere 1
 ms1=1;%Mass of sphere
@@ -131,9 +131,9 @@ sy1=(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot sphere on y
 nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot negative sphere on y
 
 %sphere2
-sxc2=8*L/10;%Sphere 2 x center
-syc2=L/2;%Sphere 2 y center
-sr2=L/20000;%Sphere 2 radius
+sxc2=L/2;%Sphere 2 x center
+syc2=L/3;%Sphere 2 y center
+sr2=L/500000;%Sphere 2 radius
 vsx2=0;%X Velocity of sphere 2
 vsy2=0;%Y velocity of sphere 
 ms2=1;%Mass of sphere
@@ -192,18 +192,27 @@ ematc2=ematc2temp;
 %     if ematc1temp(n+1)==1 & ematc1temp(n-1)==1 & ematc1temp(n+NG)==1 & ematc1temp(n-NG)==1 & ematc1temp(n+NG+1)==1 & ematc1temp(n+NG-1)==1 & ematc1temp(n-NG+1)==1 & ematc1temp(n-NG-1)==1
 %         ematc1(n)=0;
 %     end
-% end
+%end
 
-indices=find(ematc1);%Indexes of points in sphere
-Bprime=zeros(length(indices));%Initialize Bprime
-parfor n=1:length(indices)
-    rhotemp=zeros(NG^2);
-    rhotemp(indices(n))=1/dx^2;%Put charge 1 on each point in sphere
-    Phitemp=Poisson\(-rhotemp*dx^2)/e0;
-    Bprime(:,n)=Phitemp(indices);
+indices1=find(ematc1);%Indexes of points in sphere
+Bprime1=zeros(length(indices1));%Initialize Bprime
+parfor n=1:length(indices1)
+    rhotemp1=zeros(NG^2);
+    rhotemp1(indices1(n))=1/dx^2;%Put charge 1 on each point in sphere
+    Phitemp1=Poisson\(-rhotemp1*dx^2)/e0;
+    Bprime1(:,n)=Phitemp1(indices1);
 end
-Cap1=inv(Bprime);%Final Capacity Matrix
+Cap1=inv(Bprime1);%Final Capacity Matrix
 
+indices2=find(ematc2);%Indexes of points in sphere
+Bprime2=zeros(length(indices2));%Initialize Bprime
+parfor n=1:length(indices2)
+    rhotemp2=zeros(NG^2);
+    rhotemp2(indices2(n))=1/dx^2;%Put charge 1 on each point in sphere
+    Phitemp2=Poisson\(-rhotemp2*dx^2)/e0;
+    Bprime2(:,n)=Phitemp2(indices2);
+end
+Cap2=inv(Bprime2);%Final Capacity Matrix
 
 %Circular Matrix for Gained Charge
 NCirc=100;
@@ -234,10 +243,10 @@ nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;
 sx2=[sxc2-sr2:2*sr2/100:sxc2+sr2];
 sy2=real((sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2);
 nsy2=real(-(sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2);
-plot(sx1,sy1,'r')
-plot(sx1,nsy1,'r')
-plot(sx2,sy2,'r')
-plot(sx2,nsy2,'r')
+plot(sx1,real(sy1),'r')
+plot(sx1,real(nsy1),'r')
+plot(sx2,real(sy2),'r')
+plot(sx2,real(nsy2),'r')
 axis([L/NG L-L/NG L/NG L-L/NG])
 
     drawnow 
@@ -353,7 +362,7 @@ for n=1:N
 end
 
 %Compute the charge density
-rho=sum(emat.*weight(:,1:N),2)/dx^2+rho_sphere1+rho_sphere2;%rho of each grid point
+rho=sum(emat.*weight(:,1:N),2)/dx^2;%+rho_sphere1+rho_sphere2;%rho of each grid point
 
 
 
@@ -361,11 +370,15 @@ rho=sum(emat.*weight(:,1:N),2)/dx^2+rho_sphere1+rho_sphere2;%rho of each grid po
 Phi=Poisson\(-rho*dx^2)/e0;
 
 %Find the voltage of the sphere
-PhiC1=sum(Cap1'*Phi(indices),"all")/sum(Cap1,"all");
+PhiC1=sum(Cap1'*Phi(indices1),"all")/sum(Cap1,"all");
+PhiC2=sum(Cap2'*Phi(indices2),"all")/sum(Cap2,"all");
 
 %Change in charge
-drho=Cap1'*(PhiC1-Phi(indices))/dx^2;
-rho(indices)=rho(indices)+drho;%New charge
+drho1=Cap1'*(PhiC1-Phi(indices1))/dx^2;
+drho2=Cap2'*(PhiC2-Phi(indices2))/dx^2;
+
+rho(indices1)=rho(indices1)+drho1;%New charge
+rho(indices2)=rho(indices2)+drho2;%New charge
 Phi=Poisson\(-rho*dx^2)/e0;%New Voltage
 
 
