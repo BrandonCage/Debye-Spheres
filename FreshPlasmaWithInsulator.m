@@ -20,32 +20,31 @@ DT=.05;%DeltaT
 NT=200;%Iterations
 NTOUT=25;%Not used???
 NG=15;%Number of Grid Points
-nden=5;
+nden=5;%Total charge of electrons in simulation
 
-N=5000;%Number of Particles
+
+N=1000;%Number of Particles
 me=nden/N;%Mass of electron
 mp=nden/N;%mass of proton
 e=nden/N;%electron charge
-WP=1;
+
+Nin=N;
 QM=N*e;
-V0=0.2;
-VXT=0.0;
-VYT=0.0;
-XP1=1;
-YP1=1;
-VX1=0.0;
-VY1=0.0;
-mode=1;
-Q=N*e/L^2;%WP^2/(QM*N/L);
+
+
+VX1=0.0;%Velocity Petubation Magnitude
+VY1=0.0;%Velocity Petubation Magnitude
+mode=1;%wavelengths of sin
+rho_back=0;%Background charge density
 rho_sphere1=0;
 rho_sphere2=0;
 dx=L/NG;%Delta X
-BoundIter=1;
-acc=.9999999;
+acc=.9999999;%Number close to 1 as to make the Poisson Matrix nonsingular
 
 Nin=N;
 
-% initial loading for the 2 Stream instability
+% initial loading for Particle Positions
+%(Commented out some other configurations)
 %xp=linspace(0,L-L/N,N)';
 %xp=linspace(0,L/2,N)';
 xp=L*rand(N,1);
@@ -55,104 +54,107 @@ yp=L*rand(N,1);
 %xp=[0;L/2]
 %yp=[.05+L/2;.05+L/2]
 
-Temp=1000000;
-Con=me/k/Temp;
-randvtot=(-2*log((1-rand(N,1)))/Con).^.5;
-randang=2*pi*rand(N,1);
-vxp=randvtot.*cos(randang);
+
+Temp=1000000;%Initial Temperature
+Con=me/k/Temp;%Constant in Maxwellian Distribution
+randvtot=(-2*log((1-rand(N,1)))/Con).^.5;%Initialize the speeds into a Maxwellian Distribution
+randang=2*pi*rand(N,1);%Choose random direction for velocities
+vxp=randvtot.*cos(randang);%put random speed and random direction together
 vyp=randvtot.*sin(randang);
-pm=[1:N]';
-pm=1-2*mod(pm,2);
-vxp=vxp;%+pm.*V0;
-vyp=vyp;%+pm.*V0;
-% Perturbation
+
+
+% Perturbation (Utilized in 2 Stream)
 vxp=vxp+VX1*sin(2*pi*xp/L*mode);
 vyp=vyp+VY1*sin(2*pi*yp/L*mode);
 
-massmat=mp*ones(1,N);
-for n=1:N
+
+%Mass Matrix
+massmat=mp*ones(1,N);%Make all into ions
+parfor n=1:N
     if n<N/2+1
-        massmat(n)=me;
+        massmat(n)=me;%Change the first half into electrons
     end
 end
-emat=e*ones(1,N);
+%Charge Matrix
+emat=e*ones(1,N);%Make all into ions
 for n=1:N
     if n<N/2+1
-        emat(n)=-e;
+        emat(n)=-e;%Change the first half into electrons
     end
 end
 
-p=1:N;p=[p p;p p];
-v=acc*ones(NG^2,1);
-v1=ones(NG^2,1);
+%Build Poisson Matrix
+v=acc*ones(NG^2,1);%Vector of values close to one
+v1=ones(NG^2,1);%Vector of values equal to one
+%Put -4 on the diagonal and 1 on surrounding values
 Poisson=-4*diag(v1)+diag(v(1:NG^2-1),1)+diag(v(1:NG^2-1),-1)+diag(v(1:NG^2-NG),-NG)+diag(v(1:NG^2-NG),NG);
 Poisson=Poisson+diag(v(1:NG),NG^2-NG)+diag(v(1:NG),-NG^2+NG);
 
-
+%Put ones where there are some missing
 for i=1:NG
     Poisson=Poisson+full(sparse(NG*i,NG*i-NG+1,acc,NG^2,NG^2))+full(sparse(NG*i-NG+1,NG*i,acc,NG^2,NG^2));
 end
+%Remove ones from places where they shouldn't be
 for i=1:(NG-1)
     Poisson=Poisson-full(sparse(NG*i,NG*i+1,acc,NG^2,NG^2))-full(sparse(NG*i+1,NG*i,acc,NG^2,NG^2));
 end
 
+%Preallocate memory
 Ex=zeros(NG^2,1);
 Ey=zeros(NG^2,1);
 xmom=zeros(NT,1);
 ymom=zeros(NT,1);
 totEn=zeros(NT,1);
-totEnWLost=zeros(NT,1);
 totUEn=zeros(NT,1);
 totKEn=zeros(NT,1);
 UdUE=zeros(NT,1);
 LdUE=zeros(NT,1);
 lostenergy=0;
 
-bins=10;
-s1cdx=linspace(0,2*pi,bins);
-s1cdy=zeros(bins,1);
-s2cdx=linspace(0,2*pi,bins);
-s2cdy=zeros(bins,1);
+
+bins=10;%Bins for charge around the circle
+s1cdx=linspace(2*pi/bins,2*pi,bins);%Show Angle
+s1cdy=zeros(bins,1);%Initialize at 0 charge
+s2cdx=linspace(2*pi/bins,2*pi,bins);%Show Angle
+s2cdy=zeros(bins,1);%Initialize at 0 charge
 
 %sphere1
-sxc1=2*L/5;
-syc1=L/2;
-sr1=L/16;
-vsx1=0;
-vsy1=0;
-ms1=1;
+sxc1=L/2;%Sphere 1 x center
+syc1=L/2;%Sphere 1 y center
+sr1=L/4;%Sphere 1 radius
+vsx1=0;%X Velocity of sphere 1
+vsy1=0;%Y velocity of sphere 1
+ms1=1;%Mass of sphere
 
 
-sx1=[sxc1-sr1:2*sr1/100:sxc1+sr1];
-sy1=(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;
-nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;
+sx1=[sxc1-sr1:2*sr1/100:sxc1+sr1];%Data to plot the sphere on x
+sy1=(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot sphere on y
+nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot negative sphere on y
 
 %sphere2
-sxc2=3*L/5;
-syc2=L/2;
-sr2=L/16;
-vsx2=0;
-vsy2=0;
-ms2=1;
+sxc2=8*L/10;%Sphere 2 x center
+syc2=L/2;%Sphere 2 y center
+sr2=L/20000;%Sphere 2 radius
+vsx2=0;%X Velocity of sphere 2
+vsy2=0;%Y velocity of sphere 
+ms2=1;%Mass of sphere
 
-sx2=[sxc2-sr2:2*sr2/100:sxc2+sr2];
-sy2=(sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2;
-nsy2=-(sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2;
+sx2=[sxc2-sr2:2*sr2/100:sxc2+sr2];%Data to plot the sphere on x
+sy2=(sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2;%Data to plot sphere on y
+nsy2=-(sr2.^2-(sx2-sxc2).^2).^(1/2)+syc2;%Data to plot negative sphere on y
 
-In1=(((xp-sxc1).^2+(yp-syc1).^2)<sr1^2);
-In2=(((xp-sxc2).^2+(yp-syc2).^2)<sr2^2);
+In1=(((xp-sxc1).^2+(yp-syc1).^2)<sr1^2);%Particles in Sphere 1
+In2=(((xp-sxc2).^2+(yp-syc2).^2)<sr2^2);%Particles in sphere 2
 
-emat(In1)=-e;
-emat(In2)=e;
+emat(In1)=0;%Eliminate charge in sphere
+emat(In2)=0;%Elimnate charge in sphere
+
 
 %color
-c1=[linspace(1,1,N/2)];
-c1(In1(1:N/2))=3;
-c1(In2(1:N/2))=3;
-c2=[linspace(10,10,N/2)];
-c2(In1(N/2+1:N))=8;
-c2(In2(N/2+1:N))=8;
-c=[c1 c2];
+c1=[linspace(1,1,N/2)];%Ions
+c2=[linspace(10,10,N/2)];%Electrons
+c=[c1 c2];%&PUT it all together
+
 % Main computational cycle
 for it=1:NT
 % update xp
@@ -171,47 +173,22 @@ plot(sx2,sy2,'r')
 plot(sx2,nsy2,'r')
 axis([L/NG L-L/NG L/NG L-L/NG])
 
-
-
-
-hold off;
-
-%Cone=me/k/Temp;
-%Conp=mp/k/Temp;
-%xtemp=[0:.04:2];
-%ytemp=N*.04*Cone*xtemp.*exp(-Cone*xtemp.^2/2);
-%vtot=[(vxp(1:N).^2+vyp(1:N).^2).^.5;4];
-%histogram([vtot;.4],100)
-%axis([0 2 0 N/5])
-%hold on;
-%plot(xtemp,ytemp)
     drawnow 
-      %Capture the plot as an image 
+      % Capture the plot as an image 
       frame = getframe(h); 
       im = frame2im(frame); 
       [imind,cm] = rgb2ind(im,256); 
-      %Write to the GIF File 
+      % Write to the GIF File 
       if it == 1 
           imwrite(imind,cm,filename,'gif', 'Loopcount',inf); 
-     else 
+      else 
           imwrite(imind,cm,filename,'gif','WriteMode','append'); 
-     end 
-%hold off
+      end 
+hold off
 xp=xp+vxp*DT;
 yp=yp+vyp*DT;
-% apply bc on the particle positions
-for n=1:BoundIter
-out=(xp<0); 
-xp(out)=xp(out)+L;
-out=(xp>=L);
-xp(out)=xp(out)-L;
-out=(yp<0); 
-yp(out)=yp(out)+L;
-out=(yp>=L);
-yp(out)=yp(out)-L;
-end
 
-%Particle Delete
+%Particle Delete if in a bordering grid space or out of bounds
 out=xp<L/NG;
 xp(out)=[];
 yp(out)=[];
@@ -232,7 +209,6 @@ massmat(out)=[];
 c(out)=[];
 N=N-sum(out,'all');
 
-%Particle Delete
 out=yp<L/NG;
 xp(out)=[];
 yp(out)=[];
@@ -254,54 +230,54 @@ c(out)=[];
 N=N-sum(out,'all');
 
 %Add Fresh Plasma
-NGnew=4*NG-4;
-Nnew=floor(NGnew*Nin/NG^2+.5);
-randmat=randi([1 4],Nnew,1);
-in1=sum(randmat(:) == 1);
+NGnew=4*NG-4;%Border Grid spaces getting replaced
+Nnew=floor(NGnew*Nin/NG^2+.5);%Put in a number of particles to keep N about the same
+randmat=randi([1 4],Nnew,1);%Which side will they appear?
+in1=sum(randmat(:) == 1);%Put on Bottom
 xp=[xp;(L-L/NG)*rand(in1,1)];
 yp=[yp;(L/NG)*rand(in1,1)];
-in1=sum(randmat(:) == 2);
+in1=sum(randmat(:) == 2);%Put on right
 xp=[xp;L-(L/NG)*rand(in1,1)];
 yp=[yp;(L-L/NG)*rand(in1,1)];
-in1=sum(randmat(:) == 3);
+in1=sum(randmat(:) == 3);%Put on top
 xp=[xp;L/NG+(L-L/NG)*rand(in1,1)];
 yp=[yp;L-(L/NG)*rand(in1,1)];
-in1=sum(randmat(:) == 4);
+in1=sum(randmat(:) == 4);%Put on left
 xp=[xp;(L/NG)*rand(in1,1)];
 yp=[yp;L/NG+(L-L/NG)*rand(in1,1)];
 
-randvtot=(-2*log((1-rand(Nnew,1)))/Con).^.5;
-randang=2*pi*rand(Nnew,1);
+randvtot=(-2*log((1-rand(Nnew,1)))/Con).^.5;%Maxwellian
+randang=2*pi*rand(Nnew,1);%Random direction
 vxp=[vxp;randvtot.*cos(randang)];
 vyp=[vyp;randvtot.*sin(randang)];
 
-randmat=randi([0 1],Nnew,1);
+randmat=randi([0 1],Nnew,1);%Ion or Electron?
 
-emat=[emat 2*e*randmat'-e];
-massmat=[massmat (mp-me)*randmat'+me];
-c=[c 9*randmat'+1];
+emat=[emat 2*e*randmat'-e];%Set new charges
+massmat=[massmat (mp-me)*randmat'+me];%Set new masses
+c=[c 9*randmat'+1];%Set correct colors
 
-N=N+Nnew;
+N=N+Nnew;%Add new particles to N
 
-% projection p->g
-g1=cat(2,ceil(xp/dx-.5),ceil(yp/dx-.5));%put on grid points
-g=[g1;g1+1];%put on grid points
-%fraz1=1-abs(xp/dx-g1+.5);%weighting
-%fraz=[fraz1;1-fraz1]%weighting
-fraz1=((1-abs(xp/dx-g1(1:N,1)+.5))'*diag((1-abs(yp/dx-g1(1:N,2)+.5))'))';
-fraz2=((abs(xp/dx-g1(1:N,1)+.5))'*diag((1-abs(yp/dx-g1(1:N,2)+.5))'))';
-fraz3=((1-abs(xp/dx-g1(1:N,1)+.5))'*diag((abs(yp/dx-g1(1:N,2)+.5))'))';
-fraz4=((abs(xp/dx-g1(1:N,1)+.5))'*diag((abs(yp/dx-g1(1:N,2)+.5))'))';
-fraz=[fraz1 fraz2;fraz3 fraz4];
 
-% apply bc on the projection
-for n=1:BoundIter
+% Put particles on grid points
+g1=cat(2,ceil(xp/dx-.5),ceil(yp/dx-.5));%put onto the lower grid points
+g=[g1;g1+1];%Put onto lower and higher grid points
+fraz1=((1-abs(xp/dx-g1(1:N,1)+.5))'*diag((1-abs(yp/dx-g1(1:N,2)+.5))'))';%lower left weight
+fraz2=((abs(xp/dx-g1(1:N,1)+.5))'*diag((1-abs(yp/dx-g1(1:N,2)+.5))'))';%lower right weight
+fraz3=((1-abs(xp/dx-g1(1:N,1)+.5))'*diag((abs(yp/dx-g1(1:N,2)+.5))'))';%upper left weight
+fraz4=((abs(xp/dx-g1(1:N,1)+.5))'*diag((abs(yp/dx-g1(1:N,2)+.5))'))';%upper right weight
+fraz=[fraz1 fraz2;fraz3 fraz4];%Put it all together now yall
+
+% If it's on a nonexistant grip point, shift it to the other sides
 out=(g<1);
 g(out)=g(out)+NG;
 out=(g>NG);
 g(out)=g(out)-NG;
-end
 
+%Put the weights into a 3d matrix, where each row in the third
+    %dimension is a new particle. Adding all allements on each row should
+    %equal 1 in 4 adjacent indices
 for n=1:N
     if n==1
         weight=sparse([index2(g(1,1),g(1,2),NG) index2(g(1,1),g(N+1,2),NG) index2(g(N+1,1),g(1,2),NG) index2(g(N+1,1),g(N+1,2),NG)],[1 1 1 1],[fraz1(1) fraz2(1) fraz3(1) fraz4(1)] ,NG^2,N);%matrix stating weights of each particle on each grid point
@@ -311,22 +287,28 @@ for n=1:N
 end
 
 
+%Compute the charge density
 rho=sum(emat.*weight(:,1:N),2)/dx^2+rho_sphere1+rho_sphere2;%rho of each grid point
-%test=sum(rho1,'all')
 
 
-% computing fields
-Phi=Poisson\(-rho(1:NG^2)*dx^2)/e0;
+
+% compute Potential with Poissons equation
+Phi=Poisson\(-rho*dx^2)/e0;
 
 %Particle Delete
-out=(((xp-sxc1).^2+(yp-syc1).^2)<sr1^2);
-j=find(out);
-if isempty(j)==0
+out=(((xp-sxc1).^2+(yp-syc1).^2)<sr1^2);%If in sphere
+j=find(out);%Which are out
+if isempty(j)==0%Add charge to sphere
     rho_sphere1=rho_sphere1+sum(emat(j).*weight(:,j),2)/dx^2;
     weight(:,j)=[];
 end
-(sign(xp(out)-sxc1)+1).*(atan((yp(out)-syc1)./(xp(out)-sxc1)));
-lostenergy=lostenergy+.5*massmat(out)*(vxp(out).^2+vyp(out).^2);
+%Determine where the charge hit and add it to the ghraph
+angle1=(sign(-xp(out)+sxc1)+1)*.5*pi+(atan((yp(out)-syc1)./(xp(out)-sxc1)));
+binnum=floor(angle1*bins/(2*pi)+bins/4+.5);
+binnum(find(~binnum))=binnum(find(~binnum))+10;
+s1cdy=s1cdy+sparse(binnum,1,emat(out),bins,1);
+lostenergy=lostenergy+.5*massmat(out)*(vxp(out).^2+vyp(out).^2);%Kinetic energy of particles deleted
+%Delete variables
 xp(out)=[];
 yp(out)=[];
 vxp(out)=[];
@@ -334,15 +316,22 @@ vyp(out)=[];
 emat(out)=[];
 massmat(out)=[];
 c(out)=[];
-N=N-sum(out,'all');
+N=N-sum(out,'all');%Fix N
 
-out=(((xp-sxc2).^2+(yp-syc2).^2)<sr2^2);
-j=find(out);
-if isempty(j)==0
+out=(((xp-sxc2).^2+(yp-syc2).^2)<sr2^2);%If in sphere
+j=find(out);%Which are out
+if isempty(j)==0%Add charge to sphere
     rho_sphere2=rho_sphere2+sum(emat(j).*weight(:,j),2)/dx^2;
     weight(:,j)=[];
 end
+%Determine where the charge hit and add it to the ghraph
+
+angle2=(sign(-xp(out)+sxc2)+1)*.5*pi+(atan((yp(out)-syc2)./(xp(out)-sxc2)));
+binnum=floor(angle2*bins/(2*pi)+bins/4+.5);
+binnum(find(~binnum))=binnum(find(~binnum))+10;
+s2cdy=s2cdy+sparse(binnum,1,emat(out),bins,1);
 lostenergy=lostenergy+.5*massmat(out)*(vxp(out).^2+vyp(out).^2);
+%Delete Variable
 xp(out)=[];
 yp(out)=[];
 vxp(out)=[];
@@ -350,36 +339,38 @@ vyp(out)=[];
 emat(out)=[];
 massmat(out)=[];
 c(out)=[];
-N=N-sum(out,'all');
+N=N-sum(out,'all');%Fix N
+
 
 
 
 %Electric Field in x direciton
-for n=1:NG^2
-        in1=n+NG;
-        in2=n-NG;
+parfor n=1:NG^2
+        in1=n+NG;%Index of right node
+        in2=n-NG;%Index of left node
         if in1>NG^2
-            in1=in1-NG^2;
+            in1=in1-NG^2;%Fix if on right boundary
         end
         if in2<1
-            in2=in2+NG^2;
+            in2=in2+NG^2;%Fix if on left boundary
         end
-        Ex(n)=(Phi(in1)-Phi(in2))/(2*dx);
+        Ex(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in x
 end
 
 
 %Electric Field in Y Direction
-for n=1:NG^2
-        in1=n+1;
-        in2=n-1;
+parfor n=1:NG^2
+        in1=n+1;%Index of above node
+        in2=n-1;%index of lower lode
         if mod(in1,NG)==1
-            in1=in1-NG;
+            in1=in1-NG;%Fix if on the top
         end
         if mod(in2,NG)==0
-            in2=in2+NG;
+            in2=in2+NG;%fix if on the bottom
         end
-        Ey(n)=(Phi(in1)-Phi(in2))/(2*dx);
+        Ey(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in y
 end
+
 
 
 % projection q->p and update of vp
@@ -443,8 +434,8 @@ it
 
 LeftSphereForceLateral(it)=-rho_sphere1'*Ex;
 LeftSphereForceLongitude=-rho_sphere1'*Ey;
-RightSphereForceLateral(it)=-rho_sphere2'*Ex;
-RightSphereForceLongitude=-rho_sphere2'*Ey;
+%RightSphereForceLateral(it)=-rho_sphere2'*Ex;
+%RightSphereForceLongitude=-rho_sphere2'*Ey;
 
 Temp=(sum(massmat*(vxp.^2+vyp.^2),'all')/N)/2/k;
 LD =(e0*totKEn(it)/(4*pi*(nden/L^2)*e^2))^.5;
