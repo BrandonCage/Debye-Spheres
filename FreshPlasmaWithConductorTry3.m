@@ -41,8 +41,8 @@ dymom=0;
 rho_sphere1=0;
 rho_sphere2=0;
 lostenergy=0;
-esphere1=100000000*e;
-esphere2=100000000*e;
+esphere1=000*e;
+esphere2=0*e;
 changeloop=3;
 tic
 
