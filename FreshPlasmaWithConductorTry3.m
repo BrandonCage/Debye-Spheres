@@ -13,7 +13,7 @@ e0=1;%Epsilon Naught
 k=1.68637205*10^-10;%Boltzman
 DT=.01*2.284*10^10;%DeltaT
 NT=100;%Iterations
-NG=30;%Number of Grid Points
+NG=40;%Number of Grid Points
 nden=5;%Total charge of electrons in simulation
 
 
@@ -41,6 +41,10 @@ dymom=0;
 rho_sphere1=0;
 rho_sphere2=0;
 lostenergy=0;
+esphere1=100000000*e;
+esphere2=100000000*e;
+changeloop=3;
+tic
 
 %color
 c=[linspace(1,1,N/2) linspace(10,10,N/2)];%Color matrix distinguishing electrons and ions
@@ -110,6 +114,7 @@ totUEn=zeros(NT,1);
 totKEn=zeros(NT,1);
 UdUE=zeros(NT,1);
 LdUE=zeros(NT,1);
+[X,Y] = meshgrid(dx:dx:L,dx:dx:L);%make grid for rho and phi
 
 bins=10;%Bins for charge around the circle
 s1cdx=linspace(2*pi/bins,2*pi,bins);%Show Angle
@@ -119,8 +124,8 @@ s2cdy=zeros(bins,1);%Initialize at 0 charge
 
 %sphere1
 sxc1=L/2;%Sphere 1 x center
-syc1=2*L/3;%Sphere 1 y center
-sr1=L/5;%Sphere 1 radius
+syc1=2*L/5;%Sphere 1 y center
+sr1=L/11;%Sphere 1 radius
 vsx1=0;%X Velocity of sphere 1
 vsy1=0;%Y velocity of sphere 1
 ms1=1;%Mass of sphere
@@ -132,8 +137,8 @@ nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot negative sphere on y
 
 %sphere2
 sxc2=L/2;%Sphere 2 x center
-syc2=L/3;%Sphere 2 y center
-sr2=L/500000;%Sphere 2 radius
+syc2=3*L/5;%Sphere 2 y center
+sr2=L/11;%Sphere 2 radius
 vsx2=0;%X Velocity of sphere 2
 vsy2=0;%Y velocity of sphere 
 ms2=1;%Mass of sphere
@@ -214,17 +219,67 @@ parfor n=1:length(indices2)
 end
 Cap2=inv(Bprime2);%Final Capacity Matrix
 
-%Circular Matrix for Gained Charge
-NCirc=100;
-angle=linspace(2*pi/100,2*pi,NCirc)';
-xpc=sxc1+sr1*sin(angle);
-ypc=syc1+sr1*cos(angle);
+%Circular Matrix representing 1 particle around Sphere 1
+NCirc=100;%Number of particles for circle
+angle=linspace(2*pi/NCirc,2*pi,NCirc)';%angle matrix to distribute charges
+ypc=sxc1+sr1*sin(angle);
+xpc=syc1+sr1*cos(angle);
 
+charge=e/NCirc;
 
-%PUT CHARGE ON
+g1=cat(2,ceil(xpc/dx-.5),ceil(ypc/dx-.5));%put onto the lower grid points
+g=[g1;g1+1];%Put onto lower and higher grid points
+fraz1=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower left weight
+fraz2=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower right weight
+fraz3=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper left weight
+fraz4=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper right weight
+fraz=[fraz1 fraz2;fraz3 fraz4];%Put it all together now yall
 
+% If it's on a nonexistant grip point, shift it to the other sides
+out=(g<1);
+g(out)=g(out)+NG;
+out=(g>NG);
+g(out)=g(out)-NG;
 
+for n=1:NCirc
+    if n==1
+        weight=sparse([index2(g(1,1),g(1,2),NG) index2(g(1,1),g(NCirc+1,2),NG) index2(g(NCirc+1,1),g(1,2),NG) index2(g(NCirc+1,1),g(NCirc+1,2),NG)],[1 1 1 1],[fraz1(1) fraz2(1) fraz3(1) fraz4(1)] ,NG^2,NCirc);%matrix stating weights of each particle on each grid point
+    else
+        weight=weight+sparse([index2(g(n,1),g(n,2),NG) index2(g(n,1),g(NCirc+n,2),NG) index2(g(NCirc+n,1),g(n,2),NG) index2(g(NCirc+n,1),g(NCirc+n,2),NG)],[n n n n],[fraz1(n) fraz2(n) fraz3(n) fraz4(n)],NG^2,NCirc);%matrix stating weights of each particle on each grid point
+    end
+end
 
+%Make the 1 particle sphere matrix
+rho_sphere1=sum(charge.*weight(:,1:NCirc),2)/dx^2;
+
+%Circular Matrix representing 1 particle around Sphere 2
+ypc=sxc2+sr2*sin(angle);
+xpc=syc2+sr2*cos(angle);
+
+g1=cat(2,ceil(xpc/dx-.5),ceil(ypc/dx-.5));%put onto the lower grid points
+g=[g1;g1+1];%Put onto lower and higher grid points
+fraz1=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower left weight
+fraz2=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower right weight
+fraz3=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper left weight
+fraz4=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper right weight
+fraz=[fraz1 fraz2;fraz3 fraz4];%Put it all together now yall
+
+% If it's on a nonexistant grip point, shift it to the other sides
+out=(g<1);
+g(out)=g(out)+NG;
+out=(g>NG);
+g(out)=g(out)-NG;
+
+for n=1:NCirc
+    if n==1
+        weight=sparse([index2(g(1,1),g(1,2),NG) index2(g(1,1),g(NCirc+1,2),NG) index2(g(NCirc+1,1),g(1,2),NG) index2(g(NCirc+1,1),g(NCirc+1,2),NG)],[1 1 1 1],[fraz1(1) fraz2(1) fraz3(1) fraz4(1)] ,NG^2,NCirc);%matrix stating weights of each particle on each grid point
+    else
+        weight=weight+sparse([index2(g(n,1),g(n,2),NG) index2(g(n,1),g(NCirc+n,2),NG) index2(g(NCirc+n,1),g(n,2),NG) index2(g(NCirc+n,1),g(NCirc+n,2),NG)],[n n n n],[fraz1(n) fraz2(n) fraz3(n) fraz4(n)],NG^2,NCirc);%matrix stating weights of each particle on each grid point
+    end
+end
+
+%Make the 1 particle sphere matrix
+rho_sphere2=sum(charge.*weight(:,1:NCirc),2)/dx^2;
 
 %color
 c1=[linspace(1,1,N/2)];%Ions
@@ -362,31 +417,55 @@ for n=1:N
 end
 
 %Compute the charge density
-rho=sum(emat.*weight(:,1:N),2)/dx^2;%+rho_sphere1+rho_sphere2;%rho of each grid point
+rho=sum(emat.*weight(:,1:N),2)/dx^2+esphere1*rho_sphere1+esphere2*rho_sphere2;%rho of each grid point
 
+for n=1:NG
+    if n==1
+        rho1=rho(1:NG);
+    else
+        rho1=cat(2,rho1,rho((n-1)*NG+1:n*NG));
+    end
+end
 
-
-% compute Potential with Poissons equation
+toc
+tic
+drho1tot=zeros(NG^2,1);
+drho2tot=zeros(NG^2,1);
+for n=1:changeloop
 Phi=Poisson\(-rho*dx^2)/e0;
 
-%Find the voltage of the sphere
+%Find the voltage of sphere 1
 PhiC1=sum(Cap1'*Phi(indices1),"all")/sum(Cap1,"all");
-PhiC2=sum(Cap2'*Phi(indices2),"all")/sum(Cap2,"all");
-
 %Change in charge
 drho1=Cap1'*(PhiC1-Phi(indices1))/dx^2;
-drho2=Cap2'*(PhiC2-Phi(indices2))/dx^2;
-
+drho1tot(indices1)=drho1tot(indices1)+drho1;
 rho(indices1)=rho(indices1)+drho1;%New charge
+
+PhiC2=sum(Cap2'*Phi(indices2),"all")/sum(Cap2,"all");%Find the voltage of sphere 2
+drho2=Cap2'*(PhiC2-Phi(indices2))/dx^2;%Change in charge
+drho2tot(indices2)=drho2tot(indices2)+drho2;
 rho(indices2)=rho(indices2)+drho2;%New charge
+end
+toc
+tic
+
+% compute Potential with Poissons equation
 Phi=Poisson\(-rho*dx^2)/e0;%New Voltage
 
+for n=1:NG
+    if n==1
+        Phi1=Phi(1:NG);
+    else
+        Phi1=cat(2,Phi1,Phi((n-1)*NG+1:n*NG));
+    end
+end
 
-%Particle Delete
+
+%Particle Delete if in a sphere
 out=(((xp-sxc1).^2+(yp-syc1).^2)<sr1^2);%If in sphere
 j=find(out);%Which are out
 if isempty(j)==0%Add charge to sphere
-    rho_sphere1=rho_sphere1+sum(emat(j).*weight(:,j),2)/dx^2;
+    esphere1=esphere1+sum(emat(out));
     weight(:,j)=[];
 end
 %Determine where the charge hit and add it to the ghraph
@@ -408,7 +487,7 @@ N=N-sum(out,'all');%Fix N
 out=(((xp-sxc2).^2+(yp-syc2).^2)<sr2^2);%If in sphere
 j=find(out);%Which are out
 if isempty(j)==0%Add charge to sphere
-    rho_sphere2=rho_sphere2+sum(emat(j).*weight(:,j),2)/dx^2;
+    esphere2=esphere2+sum(emat(out));
     weight(:,j)=[];
 end
 %Determine where the charge hit and add it to the ghraph
@@ -461,7 +540,12 @@ end
  vxp=vxp-weight(:,1:N)'*Ex.*emat'*DT./massmat';
  vyp=vyp-weight(:,1:N)'*Ey.*emat'*DT./massmat';
     
-
+ 
+ ForceXSphere1=dx^2*(drho1tot+esphere1*rho_sphere1)'*Ex
+ ForceYSphere1=dx^2*(drho1tot+esphere1*rho_sphere1)'*Ey
+ ForceXSphere2=dx^2*(drho2tot+esphere2*rho_sphere2)'*Ex
+ ForceYSphere2=dx^2*(drho2tot+esphere2*rho_sphere2)'*Ey
+ 
 %Momentum test (Check to see if momentum is constant
 xmom(it)=sum(massmat*vxp);
 ymom(it)=sum(massmat*vyp);
@@ -524,10 +608,10 @@ plot(ymom)
 hold off
 
 figure
-plot(LeftSphereForceLateral)
-legend("Force on Sphere1")
-xlabel("time")
-ylabel("Force (Positive is Attractive)")
+surf(X,Y,Phi1)
+
+figure
+surf(X,Y,rho1)
 
 figure
 plot(s1cdx,s1cdy)
