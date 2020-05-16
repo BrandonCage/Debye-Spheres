@@ -8,18 +8,18 @@ filename = 'testAnimated2d.gif';
 
 
 
-L=30*2.284*10^10;%Length
 e0=1;%Epsilon Naught
 k=1.68637205*10^-10;%Boltzman
-meterconv=3.511282*10^-14;%Convert from meters to our units
-DT=.0001*30*2.284*10^10;%DeltaT
-NT=100;%Iterations
-NG=30;%Number of Grid Points
+meterconv=3.511282*10^-14;%Convert from our units to meters
+L=30*.001/meterconv;%Length
+DT=1/40*30*.001/meterconv;%DeltaT
+NT=2000000;%Iterations
+NG=40;%Number of Grid Points
 ndensity=2*10^10*meterconv^3;
-totalparticles=ndensity*L^3;%Total number of electrons in simulation
+totalparticles=.01%ndensity*L^3;%Total number of electrons in simulation
 
 
-N=1000;%Number of Particles
+N=2000;%Number of Particles
 me=totalparticles/N;%Mass of electron
 mp=5*totalparticles/N;%mass of proton
 e=totalparticles/N;%electron charge
@@ -42,7 +42,7 @@ rho_sphere1=0;
 rho_sphere2=0;
 lostenergy=0;
 esphere1=0;
-esphere2=0;
+esphere2=100;
 changeloop=3;
 
 
@@ -78,7 +78,7 @@ end
 
 Tempin=11700;%Initial Temperature
 Temp=11700;%Temperature that will change in time
-Con=massmat'/k/Temp;%Constant in Maxwellian Distribution
+Con=massmat'/me/k/Temp;%Constant in Maxwellian Distribution
 randvtot=(-2*log((1-rand(N,1)))./Con).^.5;%Initialize the speeds into a Maxwellian Distribution
 randang=2*pi*rand(N,1);%Choose random direction for velocities
 vxp=randvtot.*cos(randang);%put random speed and random direction together
@@ -87,17 +87,15 @@ vyp=randvtot.*sin(randang);
 %Build Poisson Matrix
 v=acc*ones(NG^2,1);%Vector of values close to one
 v1=ones(NG^2,1);%Vector of values equal to one
-%Put -4 on the diagonal and 1 on surrounding values, ignoring those on the
-%edge
+%Put -4 on the diagonal and 1 on surrounding values
 Poisson=-4*diag(v1)+diag(v(1:NG^2-1),1)+diag(v(1:NG^2-1),-1)+diag(v(1:NG^2-NG),-NG)+diag(v(1:NG^2-NG),NG);
-
-
-
-for i=1:(NG-1)
-    Poisson=Poisson-full(sparse(NG*i,NG*i+1,acc,NG^2,NG^2))-full(sparse(NG*i+1,NG*i,acc,NG^2,NG^2));
-end
+Poisson=Poisson+diag(v(1:NG),NG^2-NG)+diag(v(1:NG),-NG^2+NG);
 
 %Put ones where there are some missing
+for i=1:NG
+    Poisson=Poisson+full(sparse(NG*i,NG*i-NG+1,acc,NG^2,NG^2))+full(sparse(NG*i-NG+1,NG*i,acc,NG^2,NG^2));
+end
+%Remove ones from places where they shouldn't be
 for i=1:(NG-1)
     Poisson=Poisson-full(sparse(NG*i,NG*i+1,acc,NG^2,NG^2))-full(sparse(NG*i+1,NG*i,acc,NG^2,NG^2));
 end
@@ -108,6 +106,10 @@ Ex=zeros(NG^2,1);
 Ey=zeros(NG^2,1);
 xmom=zeros(NT,1);
 ymom=zeros(NT,1);
+ForceXSphere1=zeros(NT,1);
+ForceYSphere1=zeros(NT,1);
+ForceXSphere2=zeros(NT,1);
+ForceYSphere2=zeros(NT,1);
 totEn=zeros(NT,1);
 totUEn=zeros(NT,1);
 totKEn=zeros(NT,1);
@@ -120,7 +122,7 @@ bins=10;%Bins for charge around the circle
 %sphere1
 sxc1=L/2;%Sphere 1 x center
 syc1=2*L/5;%Sphere 1 y center
-sr1=L/11000;%Sphere 1 radius
+sr1=L/11;%Sphere 1 radius
 vsx1=0;%X Velocity of sphere 1
 vsy1=0;%Y velocity of sphere 1
 ms1=1000*me*totalparticles;%Mass of sphere
@@ -133,7 +135,7 @@ nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot negative sphere on y
 %sphere2
 sxc2=L/2;%Sphere 2 x center
 syc2=3*L/5;%Sphere 2 y center
-sr2=L/11000;%Sphere 2 radius
+sr2=L/22;%Sphere 2 radius
 vsx2=0;%X Velocity of sphere 2
 vsy2=0;%Y velocity of sphere 
 ms2=1000*me*totalparticles;%Mass of sphere
@@ -305,12 +307,12 @@ axis([L/NG L-L/NG L/NG L-L/NG])
           imwrite(imind,cm,filename,'gif','WriteMode','append'); 
       end 
 hold off
-xp=xp+vxp*DT;
-yp=yp+vyp*DT;
-syc1=syc1+vsy1*DT;
-syc2=syc2+vsy2*DT;
-sxc1=sxc1+vsx1*DT;
-sxc2=sxc2+vsx2*DT;
+xp=xp+vxp*DT*.5;
+yp=yp+vyp*DT*.5;
+syc1=syc1+vsy1*DT*.5;
+syc2=syc2+vsy2*DT*.5;
+sxc1=sxc1+vsx1*DT*.5;
+sxc2=sxc2+vsx2*DT*.5;
 
 
 
@@ -372,7 +374,7 @@ in1=sum(randmat(:) == 4);%Put on left
 xp=[xp;(L/NG)*rand(in1,1)];
 yp=[yp;L/NG+(L-L/NG)*rand(in1,1)];
 
-randvtot=(-2*log((1-rand(Nnew,1)))./(((mp-me)*randmat+me)/k/Tempin)).^.5;%Maxwellian
+randvtot=(-2*log((1-rand(Nnew,1)))./(((mp-me)*randmat+me)/me/k/Tempin)).^.5;%Maxwellian
 randang=2*pi*rand(Nnew,1);%Random direction
 vxp=[vxp;randvtot.*cos(randang)];
 vyp=[vyp;randvtot.*sin(randang)];
@@ -500,26 +502,41 @@ parfor n=1:NG^2
         in1=n+NG;%Index of right node
         in2=n-NG;%Index of left node
         if in1>NG^2
-            Ex(n)=(-Phi(in2))/(2*dx);%Fix if on right boundary
-        elseif in2<1
-            Ex(n)=(Phi(in1))/(2*dx);%Fix if on left boundary
-        else
-        Ex(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in x
+            in1=in1-NG^2;%Fix if on right boundary
         end
+        if in2<1
+            in2=in2+NG^2;%Fix if on left boundary
+        end
+        Ex(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in x
 end
 
+for n=1:NG
+    if n==1
+        Ex1=Ex(1:NG);
+    else
+        Ex1=cat(2,Ex1,Ex((n-1)*NG+1:n*NG));
+    end
+end
 
 %Electric Field in Y Direction
 parfor n=1:NG^2
         in1=n+1;%Index of above node
         in2=n-1;%index of lower lode
         if mod(in1,NG)==1
-            Ey(n)=(-Phi(in2))/(2*dx);%Fix if on the top
-        elseif mod(in2,NG)==0
-            Ey(n)=(Phi(in1))/(2*dx);%fix if on the bottom
-        else
-        Ey(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in y
+            in1=in1-NG;%Fix if on the top
         end
+        if mod(in2,NG)==0
+            in2=in2+NG;%fix if on the bottom
+        end
+        Ey(n)=(Phi(in1)-Phi(in2))/(2*dx);%Electric field in y
+end
+
+for n=1:NG
+    if n==1
+        Ey1=Ey(1:NG);
+    else
+        Ey1=cat(2,Ey1,Ey((n-1)*NG+1:n*NG));
+    end
 end
 
     %Update Velocity
@@ -527,15 +544,31 @@ end
  vyp=vyp-weight(:,1:N)'*Ey.*emat'*DT./massmat';
     
  
- ForceXSphere1=dx^2*(drho1tot+esphere1*rho_sphere1/e)'*Ex
- ForceYSphere1=dx^2*(drho1tot+esphere1*rho_sphere1/e)'*Ey
- ForceXSphere2=dx^2*(drho2tot+esphere2*rho_sphere2/e)'*Ex
- ForceYSphere2=dx^2*(drho2tot+esphere2*rho_sphere2/e)'*Ey
+ ForceXSphere1(it)=dx^2*(drho1tot+esphere1*rho_sphere1/e)'*Ex;
+ ForceYSphere1(it)=dx^2*(drho1tot+esphere1*rho_sphere1/e)'*Ey;
+ ForceXSphere2(it)=dx^2*(drho2tot+esphere2*rho_sphere2/e)'*Ex;
+ ForceYSphere2(it)=dx^2*(drho2tot+esphere2*rho_sphere2/e)'*Ey;
  
- vsx1=vsx1-ForceXSphere1*DT/ms1;%Change sphere 1 xvelocity
- vsy1=vsy1-ForceYSphere1*DT/ms1;%Change sphere 1 y velocity
- vsx2=vsx2-ForceXSphere2*DT/ms2;%Change sphere 2 x velocity
- vsy2=vsy2-ForceYSphere2*DT/ms2;%Change sphere 2 y velocity
+ vsx1=vsx1;%-ForceXSphere1*DT/ms1;%Change sphere 1 x velocity
+ vsy1=vsy1;%-ForceYSphere1*DT/ms1;%Change sphere 1 y velocity
+ vsx2=vsx2;%-ForceXSphere2*DT/ms2;%Change sphere 2 x velocity
+ vsy2=vsy2;%-ForceYSphere2*DT/ms2;%Change sphere 2 y velocity
+ 
+ for n=1:NG
+    if n==1
+        drho2tot1=drho2tot(1:NG)+esphere2*rho_sphere2(1:NG)/e;
+    else
+        drho2tot1=cat(2,drho2tot1,drho2tot((n-1)*NG+1:n*NG)+esphere2*rho_sphere2((n-1)*NG+1:n*NG)/e);
+    end
+ end
+
+ for n=1:NG
+    if n==1
+        drho1tot1=drho1tot(1:NG)+esphere1*rho_sphere1(1:NG)/e;
+    else
+        drho1tot1=cat(2,drho1tot1,drho1tot((n-1)*NG+1:n*NG)+esphere1*rho_sphere1((n-1)*NG+1:n*NG)/e);
+    end
+ end
  
  
 %Momentum test (Check to see if momentum is constant
@@ -559,18 +592,18 @@ totKEn(it)=.5*sum(massmat*(vxp.^2+vyp.^2),'all');
 it
 
 
-Temp=(sum(massmat*(vxp.^2+vyp.^2),'all')/N)/2/k;%Calculate the temperature
+Temp=(sum(massmat/me*(vxp.^2+vyp.^2),'all')/N)/2/k;%Calculate the temperature
 LD =(k*Temp/ndensity)^.5;
 if .5*LD<dx%Compare to delta x, if too small, display error
     "Error, Mesh not fine enough or not hot enough"
     LD
     dx
 end
-crtf
 PP=(pi*me*L^2/(N*e^2))^.5;%Compute plasma period 
 if .25*PP<DT%If plasma period is small display error
     "Error, large time step"
     PP 
+    DT
 end
 
 %CFL Condition
@@ -588,20 +621,42 @@ plot(totEn)
 %plot(dKE+LdUE)
 plot(totUEn)
 plot(totKEn)
-plot(totEnWLost)
+%plot(totEnWLost)
 %plot(UdUE)
 %plot(LdUE)
-legend("Energy","Potential","Kinetic","Energy Including Heat")
+legend("Energy","Potential","Kinetic")
 hold off
 
 figure
 hold on
-plot(xmom)
-plot(ymom)
+plot(ForceYSphere2/2-ForceYSphere1/2)
+plot(ForceXSphere2/2-ForceXSphere1/2)
+legend("Y Force (Positive is Attractive)","X Force")
 hold off
 
 figure
+surf(X,Y,Ex1)
+legend("Electric Field X")
+
+figure
+surf(X,Y,Ey1)
+legend("Electric Field Y")
+
+figure
+surf(X,Y,drho1tot1)
+legend("changed charge sphere 2")
+
+figure
+surf(X,Y,drho2tot1)
+legend("Changed Charge sphere 1")
+
+figure
 surf(X,Y,Phi1)
+legend("Potential")
 
 figure
 surf(X,Y,rho1)
+legend("Charge Density")
+
+
+mean=mean(ForceYSphere2/2-ForceYSphere1/2)
