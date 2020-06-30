@@ -1,3 +1,4 @@
+
 clearvars 
 close all
 
@@ -11,17 +12,17 @@ filename = 'testAnimated2d.gif';
 e0=1;%Epsilon Naught
 k=1.68637205*10^-10;%Boltzman
 meterconv=3.511282*10^-14;%Convert from our units to meters
-L=30*.01/meterconv;%Length
-DT=1/50*30*.01/meterconv;%DeltaT
+L=2/meterconv;%Length
+DT=1/70*2/meterconv;%DeltaT
 NT=1000000;%Iterations
-NG=40;%Number of Grid Points
-ndensity=2*10^10*meterconv^3;
-totalparticles=ndensity*L^2;%Total number of electrons in simulation
+NG=60;%Number of Grid Points
+ndensity=300*10^9*meterconv^3;
+totalparticles=2*ndensity*L^2;%Total number of electrons in simulation
 
 
 N=8000;%Number of Particles
 me=totalparticles/N;%Mass of electron
-mp=5*totalparticles/N;%mass of proton
+mp=20*totalparticles/N;%mass of proton
 e=totalparticles/N;%electron charge
 
 Nin=N;
@@ -31,7 +32,7 @@ VY1=0.0;%Velocity Petubation Magnitude
 mode=1;%wavelengths of sin
 rho_back=0;%Background charge density
 dx=L/NG;%Delta X
-acc=.9999999;%Number close to 1 as to make the Poisson Matrix nonsingular
+acc=1;%Number close to 1 as to make the Poisson Matrix nonsingular
 
 dE=0;%Initialization of Energy Graph Value
 dKE=0;
@@ -76,8 +77,8 @@ for n=1:N
     end
 end
 
-Tempin=11700;%Initial Temperature
-Temp=11700;%Temperature that will change in time
+Tempin=50                                                   *11700;%Initial Temperature
+Temp=Tempin;%Temperature that will change in time
 Con=massmat'/me/k/Temp;%Constant in Maxwellian Distribution
 randvtot=(-2*log((1-rand(N,1)))./Con).^.5;%Initialize the speeds into a Maxwellian Distribution
 randang=2*pi*rand(N,1);%Choose random direction for velocities
@@ -119,10 +120,12 @@ Charge2=zeros(NT,1);
 
 bins=10;%Bins for charge around the circle
 
+LD =(k*Temp/ndensity)^.5;
+
 %sphere1
 sxc1=L/2;%Sphere 1 x center
-syc1=3*L/5;%Sphere 1 y center
-sr1=L/11000;%Sphere 1 radius
+syc1=2.3*L/7;%Sphere 1 y center
+sr1=L/25;%Sphere 1 radius
 vsx1=0;%X Velocity of sphere 1
 vsy1=0;%Y velocity of sphere 1
 ms1=1000*me*totalparticles;%Mass of sphere
@@ -134,8 +137,8 @@ nsy1=-(sr1.^2-(sx1-sxc1).^2).^(1/2)+syc1;%Data to plot negative sphere on y
 
 %sphere2
 sxc2=L/2;%Sphere 2 x center
-syc2=L/2;%Sphere 2 y center
-sr2=L/10;%Sphere 2 radius
+syc2=4.7*L/7;%Sphere 2 y center
+sr2=L/25;%Sphere 2 radius
 vsx2=0;%X Velocity of sphere 2
 vsy2=0;%Y velocity of sphere 
 ms2=1000*me*totalparticles;%Mass of sphere
@@ -216,13 +219,13 @@ xpc=sxc1+sr1*sin(angle);
 ypc=syc1+sr1*cos(angle);
 
 charge=1/NCirc;
-xpc/dx-g1(1:NCirc,1)+.5
+
 g1=cat(2,ceil(xpc/dx-.5),ceil(ypc/dx-.5));%put onto the lower grid points
 g=[g1;g1+1];%Put onto lower and higher grid points
-fraz1=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower left weight
+fraz4=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower left weight
 fraz2=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((1-abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%lower right weight
 fraz3=((1-abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper left weight
-fraz4=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper right weight
+fraz1=((abs(xpc/dx-g1(1:NCirc,1)+.5))'*diag((abs(ypc/dx-g1(1:NCirc,2)+.5))'))';%upper right weight
 fraz=[fraz1 fraz2;fraz3 fraz4];%Put it all together now yall
 
 % If it's on a nonexistant grip point, shift it to the other sides
@@ -307,12 +310,12 @@ axis([L/NG L-L/NG L/NG L-L/NG])
           imwrite(imind,cm,filename,'gif','WriteMode','append'); 
       end 
 hold off
-xp=xp+vxp*DT*.5;
-yp=yp+vyp*DT*.5;
-syc1=syc1+vsy1*DT*.5;
-syc2=syc2+vsy2*DT*.5;
-sxc1=sxc1+vsx1*DT*.5;
-sxc2=sxc2+vsx2*DT*.5;
+xp=xp+vxp*DT;
+yp=yp+vyp*DT;
+syc1=syc1+vsy1*DT;
+syc2=syc2+vsy2*DT;
+sxc1=sxc1+vsx1*DT;
+sxc2=sxc2+vsx2*DT;
 
 
 
@@ -374,12 +377,13 @@ in1=sum(randmat(:) == 4);%Put on left
 xp=[xp;(L/NG)*rand(in1,1)];
 yp=[yp;L/NG+(L-L/NG)*rand(in1,1)];
 
+randmat=randi([0 1],Nnew,1);%Ion or Electron?
+
 randvtot=(-2*log((1-rand(Nnew,1)))./(((mp-me)*randmat+me)/me/k/Tempin)).^.5;%Maxwellian
 randang=2*pi*rand(Nnew,1);%Random direction
 vxp=[vxp;randvtot.*cos(randang)];
 vyp=[vyp;randvtot.*sin(randang)];
 
-randmat=randi([0 1],Nnew,1);%Ion or Electron?
 
 emat=[emat 2*e*randmat'-e];%Set new charges
 massmat=[massmat (mp-me)*randmat'+me];%Set new masses
@@ -551,6 +555,9 @@ end
  ForceXSphere2(it)=dx^2*(drho2tot+esphere2*rho_sphere2)'*Ex;
  ForceYSphere2(it)=dx^2*(drho2tot+esphere2*rho_sphere2)'*Ey;
  
+ Force1=ForceYSphere1(it)
+ Force2=ForceYSphere2(it)
+ 
  vsx1=vsx1;%-ForceXSphere1*DT/ms1;%Change sphere 1 x velocity
  vsy1=vsy1;%-ForceYSphere1*DT/ms1;%Change sphere 1 y velocity
  vsx2=vsx2;%-ForceXSphere2*DT/ms2;%Change sphere 2 x velocity
@@ -604,6 +611,7 @@ end
     end
  end
  
+ Charge1(it)=esphere1;
  Charge2(it)=esphere2;
  
 %Momentum test (Check to see if momentum is constant
@@ -628,7 +636,7 @@ it
 
 
 Temp=(sum(massmat/me*(vxp.^2+vyp.^2),'all')/N)/2/k;%Calculate the temperature
-LD =(k*Temp/ndensity)^.5;
+LD =(k*Temp/ndensity)^.5
 if .5*LD<dx%Compare to delta x, if too small, display error
     "Error, Mesh not fine enough or not hot enough"
     LD
@@ -648,14 +656,15 @@ if C>1%If time step is larger than dx
     C
 end
 
+%PhiC2*510999
 end
 figure
 hold on
-plot(totEn)
+plot(totEn(1:it-1))
 %plot(dKE+UdUE)
 %plot(dKE+LdUE)
-plot(totUEn)
-plot(totKEn)
+plot(totUEn(1:it-1))
+plot(totKEn(1:it-1))
 %plot(totEnWLost)
 %plot(UdUE)
 %plot(LdUE)
@@ -664,62 +673,74 @@ hold off
 
 figure
 hold on
-plot(ForceYSphere2/2-ForceYSphere1/2)
-plot(ForceXSphere2/2-ForceXSphere1/2)
+plot(ForceYSphere2(1:it-1)/2-ForceYSphere1(1:it-1)/2)
+plot(ForceXSphere2(1:it-1)/2-ForceXSphere1(1:it-1)/2)
 legend("Y Force (Positive is Attractive)","X Force")
 hold off
 
 figure
-surf(X,Y,Ex1)
-legend("Electric Field X")
+plot(ForceYSphere1(1:it-1))
+legend("Y Force Sphere 1")
 
 figure
-surf(X,Y,Ey1)
-legend("Electric Field Y")
+plot(ForceYSphere2(1:it-1))
+legend("Y Force Sphere 2")
 
 % figure
-% surf(X,Y,drho1tot1)
-% legend("Charge sphere 1")
-
-figure
-surf(X,Y,drho2tot1)
-legend("Charge sphere 2")
+% surf(X,Y,Ex1)
+% legend("Electric Field X")
 % 
 % figure
-% surf(X,Y,drho1tot2)
-% legend("changed charge sphere 1")
-
-figure
-surf(X,Y,drho2tot2)
-legend("Changed Charge sphere 2")
+% surf(X,Y,Ey1)
+% legend("Electric Field Y")
+% 
+%  figure
+%  surf(X,Y,drho1tot1)
+%  legend("Charge sphere 1")
 % 
 % figure
-% surf(X,Y,drho1tot3)
-% legend("Ring of charge sphere 1")
+% surf(X,Y,drho2tot1)
+% legend("Charge sphere 2")
+%  
+%  figure
+%  surf(X,Y,drho1tot2)
+%  legend("changed charge sphere 1")
+% 
+% figure
+% surf(X,Y,drho2tot2)
+% legend("Changed Charge sphere 2")
+%  
+%  figure
+%  surf(X,Y,drho1tot3)
+%  legend("Ring of charge sphere 1")
+% 
+% figure
+% surf(X,Y,drho2tot3)
+% legend("Ring of charge sphere 2")
 
 figure
-surf(X,Y,drho2tot3)
-legend("Ring of charge sphere 2")
-
-
-figure
-surf(X,Y,Phi1)
+surf(X,Y,Phi1*510999)
 legend("Potential")
 
-figure
-surf(X,Y,rho1)
-legend("Charge Density")
-
-
-figure
-plot(Charge2)
-legend("Sphere Total Charge")
+% figure
+% surf(X,Y,rho1)
+% legend("Charge Density")
 
 figure
-plot(Volt2)
-legend("Sphere Potential")
+plot(Charge1(1:it-1))
+legend("Sphere Total Charge 1")
 
+figure
+plot(Charge2(1:it-1))
+legend("Sphere Total Charge 2")
 
+figure
+plot(Volt1(1:it-1)*510999)
+legend("Sphere 1 Potential")
+
+figure
+plot(Volt2(1:it-1)*510999)
+legend("Sphere 2 Potential")
 
 
 % 
